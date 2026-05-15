@@ -1,0 +1,651 @@
+<!--
+  รายงานอุบัติเหตุอุตสาหกรรมโลก — Global Industrial Accident Dashboard
+  วิธีการ Deploy บน Vercel:
+  1. Push ไฟล์ทั้งหมดนี้ไปยัง GitHub repository
+  2. ไปที่ vercel.com สมัครฟรี แล้วคลิก "Import Project" เลือก repository จาก GitHub
+  3. ใน Vercel project settings → Environment Variables → เพิ่ม GEMINI_API_KEY
+     พร้อมใส่ Gemini API key ที่ได้จาก aistudio.google.com
+  4. คลิก Deploy — เว็บไซต์จะพร้อมใช้งานที่ yourproject.vercel.app
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>รายงานอุบัติเหตุอุตสาหกรรมโลก</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #1a2744;
+      --navy-light: #243460;
+      --red: #c0392b;
+      --red-light: #fdecea;
+      --orange: #e67e22;
+      --orange-light: #fef3e2;
+      --blue: #2980b9;
+      --blue-light: #e8f4fd;
+      --bg: #f4f6f9;
+      --white: #ffffff;
+      --border: #dde3ec;
+      --text: #2c3e50;
+      --text-muted: #6b7a8d;
+    }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      color: #fff;
+      padding: 20px 0 0;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .header-subtitle {
+      font-size: 0.95rem;
+      color: #a8b8d8;
+      margin-top: 2px;
+    }
+    .stat-bar {
+      display: flex;
+      gap: 0;
+      margin-top: 18px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .stat-item {
+      flex: 1;
+      padding: 14px 20px;
+      border-right: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-value {
+      font-size: 1.9rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.78rem;
+      color: #a8b8d8;
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-item.red .stat-value   { color: #ff6b6b; }
+    .stat-item.orange .stat-value { color: #ffa94d; }
+    .stat-item.blue .stat-value  { color: #74c0fc; }
+
+    /* ── Main layout ── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px;
+    }
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--navy);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--navy);
+      border-radius: 2px;
+    }
+    .card-wrap {
+      background: var(--white);
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    /* ── Map ── */
+    #map {
+      height: 420px;
+      border-radius: 6px;
+      z-index: 0;
+    }
+    .map-legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+
+    /* ── Monthly table ── */
+    .table-scroll { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    thead th {
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+    }
+    thead th:not(:first-child) { text-align: center; }
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 9px 14px;
+      color: var(--text);
+    }
+    tbody td:not(:first-child) { text-align: center; }
+    tbody tr.current-month {
+      background: #eef2ff;
+      font-weight: 600;
+    }
+    tbody tr.current-month td:first-child {
+      color: var(--navy);
+      border-left: 3px solid var(--navy);
+    }
+    tbody tr:not(.current-month):hover { background: #f8f9fc; }
+    .zero { color: #bbb; }
+
+    /* ── Accident cards ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .accident-card {
+      background: var(--white);
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border-left: 5px solid var(--blue);
+      overflow: hidden;
+      transition: box-shadow 0.15s;
+    }
+    .accident-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.13); }
+    .accident-card.red    { border-left-color: var(--red); }
+    .accident-card.orange { border-left-color: var(--orange); }
+    .accident-card.blue   { border-left-color: var(--blue); }
+
+    .card-header {
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-num {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: var(--navy);
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-bottom: 5px;
+    }
+    .card-location {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--navy);
+    }
+    .card-date {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .card-body { padding: 12px 16px 14px; }
+    .card-field { margin-bottom: 8px; }
+    .card-field:last-child { margin-bottom: 0; }
+    .field-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 2px;
+    }
+    .field-value { font-size: 0.88rem; line-height: 1.5; }
+
+    .casualties.red    { color: var(--red);    font-weight: 600; }
+    .casualties.orange { color: var(--orange); font-weight: 600; }
+    .casualties.blue   { color: var(--blue);   font-weight: 600; }
+
+    .ref-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 0.82rem;
+      word-break: break-all;
+    }
+    .ref-link:hover { text-decoration: underline; }
+
+    /* ── AI Summary ── */
+    .ai-section { margin-bottom: 28px; }
+    .ai-btn {
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      padding: 11px 28px;
+      border-radius: 6px;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+    .ai-btn:hover { background: var(--navy-light); }
+    .ai-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+    .ai-btn svg { width: 18px; height: 18px; }
+
+    .spinner {
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ai-result {
+      margin-top: 16px;
+      background: #f0f4ff;
+      border-left: 4px solid var(--navy);
+      border-radius: 0 6px 6px 0;
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .ai-error {
+      margin-top: 16px;
+      background: var(--red-light);
+      border-left: 4px solid var(--red);
+      border-radius: 0 6px 6px 0;
+      padding: 14px 18px;
+      font-size: 0.9rem;
+      color: var(--red);
+      display: none;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .header h1 { font-size: 1.2rem; }
+      .stat-value { font-size: 1.5rem; }
+      .stat-item { padding: 10px 12px; }
+      .cards-grid { grid-template-columns: 1fr; }
+      #map { height: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <div class="header-inner">
+    <h1>รายงานอุบัติเหตุอุตสาหกรรมโลก</h1>
+    <p class="header-subtitle" id="subtitle">กำลังโหลด...</p>
+  </div>
+  <div class="header-inner">
+    <div class="stat-bar">
+      <div class="stat-item blue">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">เหตุการณ์ทั้งหมด</div>
+      </div>
+      <div class="stat-item red">
+        <div class="stat-value" id="stat-fatalities">—</div>
+        <div class="stat-label">ผู้เสียชีวิต (ราย)</div>
+      </div>
+      <div class="stat-item orange">
+        <div class="stat-value" id="stat-injuries">—</div>
+        <div class="stat-label">ผู้บาดเจ็บ (ราย)</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ── MAP ── -->
+  <section>
+    <h2 class="section-title">แผนที่เหตุการณ์</h2>
+    <div class="card-wrap" style="padding-bottom: 16px;">
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#c0392b;"></div>
+          <span>มีผู้เสียชีวิต</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#e67e22;"></div>
+          <span>มีผู้บาดเจ็บเท่านั้น</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#2980b9;"></div>
+          <span>ไม่มีผู้ได้รับบาดเจ็บ</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MONTHLY TABLE ── -->
+  <section>
+    <h2 class="section-title">สรุปรายเดือน</h2>
+    <div class="card-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>เดือน</th>
+              <th>จำนวนเหตุการณ์</th>
+              <th>ผู้เสียชีวิต</th>
+              <th>ผู้บาดเจ็บ</th>
+            </tr>
+          </thead>
+          <tbody id="monthly-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ACCIDENT CARDS ── -->
+  <section>
+    <h2 class="section-title">รายละเอียดเหตุการณ์</h2>
+    <div class="cards-grid" id="cards-container"></div>
+  </section>
+
+  <!-- ── AI SUMMARY ── -->
+  <section class="ai-section">
+    <h2 class="section-title">สรุปโดย AI</h2>
+    <div class="card-wrap">
+      <button class="ai-btn" id="ai-btn" onclick="requestAISummary()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+          <path d="M12 8v4l3 3"/>
+        </svg>
+        สรุปโดย AI
+      </button>
+      <div class="ai-result" id="ai-result"></div>
+      <div class="ai-error"  id="ai-error"></div>
+    </div>
+  </section>
+
+</div>
+
+<noscript><p style="font-family:sans-serif;text-align:center;padding:40px;">กรุณาเปิดใช้งาน JavaScript เพื่อดูรายงาน</p></noscript>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const THAI_MONTHS = [
+  'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'
+];
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function thaiDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return `${d} ${THAI_MONTHS[m - 1]} ${y + 543}`;
+}
+
+function severityClass(acc) {
+  if (acc.fatalities > 0) return 'red';
+  if (acc.injuries   > 0) return 'orange';
+  return 'blue';
+}
+
+function markerColor(acc) {
+  if (acc.fatalities > 0) return '#c0392b';
+  if (acc.injuries   > 0) return '#e67e22';
+  return '#2980b9';
+}
+
+function casualtyText(acc) {
+  if (acc.fatalities === 0 && acc.injuries === 0) {
+    return 'ไม่มีผู้ได้รับบาดเจ็บหรือเสียชีวิต';
+  }
+  const parts = [];
+  if (acc.fatalities > 0) parts.push(`ผู้เสียชีวิต ${acc.fatalities} ราย`);
+  if (acc.injuries   > 0) parts.push(`ผู้ได้รับบาดเจ็บ ${acc.injuries} ราย`);
+  return parts.join(' และ');
+}
+
+let allAccidents = [];
+let currentMonthAccidents = [];
+
+async function init() {
+  const res  = await fetch('/data/accidents.json');
+  allAccidents = await res.json();
+
+  const now  = new Date();
+  const curM = now.getMonth();
+  const curY = now.getFullYear();
+
+  currentMonthAccidents = allAccidents.filter(a => {
+    const d = parseLocalDate(a.date);
+    return d.getMonth() === curM && d.getFullYear() === curY;
+  });
+
+  updateHeader(curM, curY);
+  initMap();
+  renderMonthlyTable(curM, curY);
+  renderCards();
+}
+
+function updateHeader(curM, curY) {
+  document.getElementById('subtitle').textContent =
+    `${THAI_MONTHS[curM]} ${curY + 543}`;
+
+  const totalF = currentMonthAccidents.reduce((s, a) => s + a.fatalities, 0);
+  const totalI = currentMonthAccidents.reduce((s, a) => s + a.injuries,   0);
+
+  document.getElementById('stat-total').textContent      = currentMonthAccidents.length;
+  document.getElementById('stat-fatalities').textContent = totalF;
+  document.getElementById('stat-injuries').textContent   = totalI;
+}
+
+function initMap() {
+  const map = L.map('map').setView([20, 15], 2);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18
+  }).addTo(map);
+
+  allAccidents.forEach(acc => {
+    const color = markerColor(acc);
+    const marker = L.circleMarker([acc.lat, acc.lng], {
+      radius: 10,
+      fillColor: color,
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.85
+    }).addTo(map);
+
+    marker.bindPopup(`
+      <div style="font-family:'Sarabun',sans-serif;min-width:220px;font-size:13px;">
+        <div style="font-weight:700;margin-bottom:4px;">เหตุการณ์ที่ ${esc(acc.id)}</div>
+        <div><b>วันที่:</b> ${esc(thaiDate(acc.date))}</div>
+        <div><b>สถานที่:</b> ${esc(acc.location)}</div>
+        <div style="margin-top:4px;"><b>ผลกระทบ:</b> ${esc(casualtyText(acc))}</div>
+      </div>
+    `);
+  });
+}
+
+function renderMonthlyTable(curM, curY) {
+  const monthlyMap = {};
+  allAccidents.forEach(a => {
+    const d = new Date(a.date);
+    const d = parseLocalDate(a.date);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!monthlyMap[key]) monthlyMap[key] = { count: 0, fatalities: 0, injuries: 0 };
+    monthlyMap[key].count++;
+    monthlyMap[key].fatalities += a.fatalities;
+    monthlyMap[key].injuries   += a.injuries;
+  });
+
+  const tbody = document.getElementById('monthly-table-body');
+  tbody.innerHTML = '';
+
+  for (let m = 0; m < 12; m++) {
+    const key  = `${curY}-${m}`;
+    const data = monthlyMap[key] || null;
+    const tr   = document.createElement('tr');
+    if (m === curM) tr.classList.add('current-month');
+
+    const cell = (n) => n === 0
+      ? `<td class="zero">${n}</td>`
+      : `<td>${n}</td>`;
+
+    tr.innerHTML = `
+      <td>${THAI_MONTHS[m]}</td>
+      ${data ? cell(data.count) : '<td class="zero">—</td>'}
+      ${data ? cell(data.fatalities) : '<td class="zero">—</td>'}
+      ${data ? cell(data.injuries)   : '<td class="zero">—</td>'}
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderCards() {
+  const sorted = [...allAccidents].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const container = document.getElementById('cards-container');
+  container.innerHTML = '';
+
+  sorted.forEach(acc => {
+    const sev = severityClass(acc);
+    const div = document.createElement('div');
+    div.className = `accident-card ${sev}`;
+    div.innerHTML = `
+      <div class="card-header">
+        <span class="card-num">เหตุการณ์ที่ ${esc(acc.id)}</span>
+        <div class="card-location">${esc(acc.location)}</div>
+        <div class="card-date">วันที่ ${esc(thaiDate(acc.date))}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-field">
+          <div class="field-label">เหตุการณ์</div>
+          <div class="field-value">${esc(acc.event)}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">ผลกระทบ</div>
+          <div class="field-value casualties ${sev}">${esc(casualtyText(acc))}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">อ้างอิง</div>
+          <div class="field-value">
+            <a class="ref-link" href="${esc(acc.reference)}" target="_blank" rel="noopener noreferrer">
+              ${esc(acc.reference)}
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function requestAISummary() {
+  const btn    = document.getElementById('ai-btn');
+  const result = document.getElementById('ai-result');
+  const errEl  = document.getElementById('ai-error');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> กำลังประมวลผล...';
+  result.style.display = 'none';
+  errEl.style.display  = 'none';
+
+  const now  = new Date();
+  const curM = now.getMonth();
+  const curY = now.getFullYear();
+
+  try {
+    const res = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accidents: currentMonthAccidents,
+        month: THAI_MONTHS[curM],
+        year: curY + 543
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'เกิดข้อผิดพลาด');
+    }
+
+    result.textContent   = data.summary;
+    result.style.display = 'block';
+  } catch (err) {
+    errEl.textContent   = `เกิดข้อผิดพลาด: ${err.message}`;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+      สรุปโดย AI`;
+  }
+}
+
+init().catch(err => {
+  document.getElementById('subtitle').textContent = 'เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณารีเฟรชหน้าเว็บ';
+  console.error('Init error:', err);
+});
+</script>
+</body>
+</html>
