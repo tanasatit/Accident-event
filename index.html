@@ -1,650 +1,404 @@
 <!--
   รายงานอุบัติเหตุอุตสาหกรรมโลก — Global Industrial Accident Dashboard
   วิธีการ Deploy บน Vercel:
-  1. Push ไฟล์ทั้งหมดนี้ไปยัง GitHub repository
-  2. ไปที่ vercel.com สมัครฟรี แล้วคลิก "Import Project" เลือก repository จาก GitHub
-  3. ใน Vercel project settings → Environment Variables → เพิ่ม GEMINI_API_KEY
-     พร้อมใส่ Gemini API key ที่ได้จาก aistudio.google.com
-  4. คลิก Deploy — เว็บไซต์จะพร้อมใช้งานที่ yourproject.vercel.app
+  1. Push ไฟล์ทั้งหมด (index.html, api/, data/, vercel.json) ขึ้น GitHub
+  2. ไปที่ vercel.com → "Add New Project" → Import จาก GitHub
+  3. Project Settings → Environment Variables → เพิ่ม:
+     - GEMINI_API_KEY  (รับได้ที่ aistudio.google.com)
+     - ALLOWED_ORIGIN  (URL Vercel ของคุณ เช่น https://yourproject.vercel.app)
+  4. กด Deploy — เว็บไซต์จะพร้อมใช้งานทันที
+  สำหรับทดสอบในเครื่อง: cp .env.sample .env  แล้วรัน  vercel dev
 -->
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>รายงานอุบัติเหตุอุตสาหกรรมโลก</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงานอุบัติเหตุอุตสาหกรรมโลก 2569</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --navy: #1a2744;
-      --navy-light: #243460;
-      --red: #c0392b;
-      --red-light: #fdecea;
-      --orange: #e67e22;
-      --orange-light: #fef3e2;
-      --blue: #2980b9;
-      --blue-light: #e8f4fd;
-      --bg: #f4f6f9;
-      --white: #ffffff;
-      --border: #dde3ec;
-      --text: #2c3e50;
-      --text-muted: #6b7a8d;
+      --navy:#1a2744;--navy-mid:#1e3060;
+      --cream:#F0F4F8;--surface:#fff;--outline:#E2E8F0;
+      --sv:#F8FAFC;--text1:#1E293B;--text2:#64748B;--textm:#CBD5E1;
+      --red:#DC2626;--red-bg:#FEF2F2;--red-bd:#FECACA;
+      --ora:#EA580C;--ora-bg:#FFF7ED;--ora-bd:#FED7AA;
+      --blu:#2563EB;--blu-bg:#EFF6FF;--blu-bd:#BFDBFE;
+      --r-md:12px;--r-lg:16px;--r-xl:20px;--r-pill:9999px;
+      --sh-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+      --sh-md:0 4px 16px rgba(0,0,0,.08);
+      --sh-lg:0 8px 32px rgba(0,0,0,.10);
+      --font-th:'Sarabun',sans-serif;
+      --font-d:'Plus Jakarta Sans',sans-serif;
     }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font-th);background:var(--cream);color:var(--text1);line-height:1.65;-webkit-font-smoothing:antialiased}
 
-    body {
-      font-family: 'Sarabun', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 15px;
-      line-height: 1.6;
-    }
+    /* HEADER */
+    .hdr{background:linear-gradient(140deg,#0f1c36 0%,#1a2744 45%,#1e3a6e 100%);color:#fff;padding:28px 24px 0;position:relative;overflow:hidden}
+    .hdr::before{content:'';position:absolute;top:-80px;right:-80px;width:320px;height:320px;background:rgba(255,255,255,.03);border-radius:50%;pointer-events:none}
+    .hdr::after{content:'';position:absolute;bottom:-60px;left:25%;width:200px;height:200px;background:rgba(255,255,255,.02);border-radius:50%;pointer-events:none}
+    .hdr-top{max-width:1280px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;position:relative;z-index:1}
+    .hdr-brand{display:flex;align-items:center;gap:14px}
+    .hdr-ico{width:50px;height:50px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+    .hdr-title{font-family:var(--font-d);font-size:clamp(16px,2.5vw,24px);font-weight:800;letter-spacing:-.02em;line-height:1.2}
+    .hdr-sub{font-size:13px;color:rgba(255,255,255,.55);margin-top:3px}
+    .hdr-period{text-align:right;flex-shrink:0}
+    .period-lbl{font-family:var(--font-d);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .period-val{font-size:clamp(18px,2vw,22px);font-weight:700;color:rgba(255,255,255,.95);margin-top:3px}
+    .stat-bar{max-width:1280px;margin:24px auto 0;display:grid;grid-template-columns:repeat(3,1fr);position:relative;z-index:1;background:rgba(255,255,255,.07);border-radius:var(--r-lg) var(--r-lg) 0 0;overflow:hidden}
+    .stat-item{padding:16px 20px;text-align:center;transition:background .2s}
+    .stat-item+.stat-item{border-left:1px solid rgba(255,255,255,.08)}
+    .stat-item:hover{background:rgba(255,255,255,.09)}
+    .stat-lbl{font-size:11px;color:rgba(255,255,255,.55);font-weight:500;letter-spacing:.03em}
+    .stat-val{font-family:var(--font-d);font-size:clamp(26px,3.5vw,36px);font-weight:800;color:#fff;letter-spacing:-.02em;line-height:1.1;margin-top:2px}
+    .stat-val.red{color:#FCA5A5}.stat-val.ora{color:#FDBA74}
 
-    /* ── Header ── */
-    .header {
-      background: var(--navy);
-      color: #fff;
-      padding: 20px 0 0;
-    }
-    .header-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 20px;
-    }
-    .header h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
-    .header-subtitle {
-      font-size: 0.95rem;
-      color: #a8b8d8;
-      margin-top: 2px;
-    }
-    .stat-bar {
-      display: flex;
-      gap: 0;
-      margin-top: 18px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
-    .stat-item {
-      flex: 1;
-      padding: 14px 20px;
-      border-right: 1px solid rgba(255,255,255,0.1);
-      text-align: center;
-    }
-    .stat-item:last-child { border-right: none; }
-    .stat-value {
-      font-size: 1.9rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-    .stat-label {
-      font-size: 0.78rem;
-      color: #a8b8d8;
-      margin-top: 3px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .stat-item.red .stat-value   { color: #ff6b6b; }
-    .stat-item.orange .stat-value { color: #ffa94d; }
-    .stat-item.blue .stat-value  { color: #74c0fc; }
+    /* MAIN */
+    .main{max-width:1280px;margin:0 auto;padding:32px 24px 56px}
+    .sec{margin-bottom:40px}
+    .sec-title{font-family:var(--font-d);font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .sec-title::before{content:'';width:4px;height:20px;background:var(--navy);border-radius:2px;flex-shrink:0}
 
-    /* ── Main layout ── */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 28px 20px;
-    }
-    .section-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--navy);
-      margin-bottom: 14px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid var(--navy);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-title::before {
-      content: '';
-      display: inline-block;
-      width: 4px;
-      height: 18px;
-      background: var(--navy);
-      border-radius: 2px;
-    }
-    .card-wrap {
-      background: var(--white);
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      padding: 20px;
-      margin-bottom: 28px;
-    }
+    /* MAP */
+    .map-wrap{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm);position:relative}
+    #world-map{height:430px;width:100%;z-index:1}
+    .map-legend{position:absolute;bottom:14px;right:14px;background:#fff;border:1px solid var(--outline);border-radius:var(--r-md);padding:12px 14px;box-shadow:var(--sh-md);z-index:1000;display:flex;flex-direction:column;gap:6px}
+    .leg-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px}
+    .leg-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text1);font-weight:500}
+    .leg-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.12);flex-shrink:0}
+    .leaflet-popup-content-wrapper{border-radius:var(--r-md) !important;box-shadow:var(--sh-lg) !important;font-family:var(--font-th) !important}
+    .popup-num{font-size:10px;color:#64748B;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+    .popup-loc{font-size:15px;font-weight:700;color:#1E293B;margin:4px 0 6px}
+    .popup-date{font-size:12px;color:#64748B;margin-bottom:8px}
+    .popup-tags{display:flex;flex-wrap:wrap;gap:6px}
+    .ptag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:var(--r-pill)}
+    .ptag.red{background:var(--red-bg);color:var(--red)}.ptag.ora{background:var(--ora-bg);color:var(--ora)}.ptag.blu{background:var(--blu-bg);color:var(--blu)}
 
-    /* ── Map ── */
-    #map {
-      height: 420px;
-      border-radius: 6px;
-      z-index: 0;
-    }
-    .map-legend {
-      display: flex;
-      gap: 20px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-    .legend-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid rgba(0,0,0,0.2);
-      flex-shrink: 0;
-    }
+    /* TABLE */
+    .tbl-card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm)}
+    .monthly-tbl{width:100%;border-collapse:collapse;font-size:14px}
+    .monthly-tbl thead tr{background:var(--sv);border-bottom:2px solid var(--outline)}
+    .monthly-tbl th{padding:11px 20px;text-align:left;font-family:var(--font-d);font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+    .monthly-tbl th:not(:first-child){text-align:center}
+    .monthly-tbl td{padding:12px 20px;border-bottom:1px solid var(--outline);font-weight:500;color:var(--text1)}
+    .monthly-tbl td:not(:first-child){text-align:center}
+    .monthly-tbl tr:last-child td{border-bottom:none}
+    .monthly-tbl tr:hover:not(.cur) td{background:var(--sv)}
+    .monthly-tbl tr.cur{background:#EBF5FF}
+    .monthly-tbl tr.cur td{color:var(--navy);font-weight:700}
+    .monthly-tbl tr.empty td{color:var(--textm);font-weight:400}
+    .cur-badge{display:inline-flex;align-items:center;background:var(--navy);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-pill);margin-left:8px}
+    .tbl-foot{background:var(--sv);border-top:2px solid var(--outline);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .tbl-foot-label{font-family:var(--font-d);font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.04em;text-transform:uppercase}
+    .totals{display:flex;gap:24px}
+    .total-item{text-align:center}
+    .total-v{font-family:var(--font-d);font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+    .total-v.red{color:var(--red)}.total-v.ora{color:var(--ora)}
+    .total-l{font-size:11px;color:var(--text2)}
 
-    /* ── Monthly table ── */
-    .table-scroll { overflow-x: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-    thead th {
-      background: var(--navy);
-      color: #fff;
-      padding: 10px 14px;
-      text-align: left;
-      font-weight: 600;
-    }
-    thead th:not(:first-child) { text-align: center; }
-    tbody tr { border-bottom: 1px solid var(--border); }
-    tbody tr:last-child { border-bottom: none; }
-    tbody td {
-      padding: 9px 14px;
-      color: var(--text);
-    }
-    tbody td:not(:first-child) { text-align: center; }
-    tbody tr.current-month {
-      background: #eef2ff;
-      font-weight: 600;
-    }
-    tbody tr.current-month td:first-child {
-      color: var(--navy);
-      border-left: 3px solid var(--navy);
-    }
-    tbody tr:not(.current-month):hover { background: #f8f9fc; }
-    .zero { color: #bbb; }
+    /* CARDS */
+    .cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .acc-card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm);transition:box-shadow .2s,transform .18s;position:relative}
+    .acc-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
+    .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
+    .acc-card.red .stripe{background:var(--red)}.acc-card.ora .stripe{background:var(--ora)}.acc-card.blu .stripe{background:var(--blu)}
+    .card-in{padding:18px 18px 18px 22px}
+    .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .card-head-l{display:flex;align-items:flex-start;gap:11px;flex:1;min-width:0}
+    .card-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:12px;font-weight:800;flex-shrink:0;margin-top:2px}
+    .acc-card.red .card-num{background:var(--red-bg);color:var(--red)}.acc-card.ora .card-num{background:var(--ora-bg);color:var(--ora)}.acc-card.blu .card-num{background:var(--blu-bg);color:var(--blu)}
+    .card-loc{font-size:14px;font-weight:700;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .card-date{font-size:12px;color:var(--text2);margin-top:2px}
+    .sev-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);white-space:nowrap}
+    .acc-card.red .sev-badge{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+    .acc-card.ora .sev-badge{background:var(--ora-bg);color:var(--ora);border:1px solid var(--ora-bd)}
+    .acc-card.blu .sev-badge{background:var(--blu-bg);color:var(--blu);border:1px solid var(--blu-bd)}
+    .card-div{height:1px;background:var(--outline);margin:0 0 12px}
+    .field{margin-bottom:11px}.field:last-child{margin-bottom:0}
+    .field-lbl{font-family:var(--font-d);font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+    .field-txt{font-size:13.5px;color:var(--text1);line-height:1.65}
+    .field-impact{font-size:13.5px;font-weight:700}
+    .acc-card.red .field-impact{color:var(--red)}.acc-card.ora .field-impact{color:var(--ora)}.acc-card.blu .field-impact{color:var(--blu)}
+    .field-link{font-size:12.5px;color:var(--navy);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;transition:color .15s;word-break:break-all}
+    .field-link:hover{color:var(--blu);text-decoration:underline}
 
-    /* ── Accident cards ── */
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 16px;
-    }
-    .accident-card {
-      background: var(--white);
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      border-left: 5px solid var(--blue);
-      overflow: hidden;
-      transition: box-shadow 0.15s;
-    }
-    .accident-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.13); }
-    .accident-card.red    { border-left-color: var(--red); }
-    .accident-card.orange { border-left-color: var(--orange); }
-    .accident-card.blue   { border-left-color: var(--blue); }
+    /* AI SECTION */
+    .ai-wrap{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm)}
+    .ai-hdr{background:linear-gradient(140deg,#0f1c36,#1a2744 60%,#1e3a6e);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    .ai-hdr-l{display:flex;align-items:center;gap:12px}
+    .ai-ico{width:40px;height:40px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:20px}
+    .ai-title{font-family:var(--font-d);font-size:16px;font-weight:800;color:#fff}
+    .ai-subtitle{font-size:12px;color:rgba(255,255,255,.55);margin-top:2px}
+    .ai-btn{display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--navy);border:none;padding:10px 22px;border-radius:var(--r-pill);font-family:var(--font-th);font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;white-space:nowrap}
+    .ai-btn:hover:not(:disabled){opacity:.92;transform:translateY(-1px)}.ai-btn:active:not(:disabled){transform:scale(.98)}.ai-btn:disabled{opacity:.55;cursor:not-allowed}
+    .ai-body{padding:24px}
+    .ai-placeholder{text-align:center;padding:36px 20px;color:var(--text2)}
+    .ai-ph-ico{font-size:38px;margin-bottom:12px}
+    .ai-ph-txt{font-size:14px}
+    .ai-loading{display:flex;align-items:center;justify-content:center;gap:12px;padding:36px;color:var(--text2);font-size:14px}
+    .spinner{width:22px;height:22px;border:2.5px solid var(--outline);border-top-color:var(--navy);border-radius:50%;animation:spin .75s linear infinite;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ai-result{font-size:15px;line-height:1.85;color:var(--text1)}
+    .ai-result p{margin-bottom:14px}.ai-result p:last-child{margin-bottom:0}
+    .ai-error{background:var(--red-bg);border:1px solid var(--red-bd);border-radius:var(--r-md);padding:14px 16px;color:var(--red);font-size:14px}
+    .load-error{text-align:center;padding:60px 20px;color:var(--red);font-size:15px}
 
-    .card-header {
-      padding: 12px 16px 10px;
-      border-bottom: 1px solid var(--border);
+    /* RESPONSIVE */
+    @media(max-width:768px){.cards-grid{grid-template-columns:1fr}.stat-val{font-size:26px}}
+    @media(max-width:600px){
+      .hdr{padding:20px 16px 0}.main{padding:20px 16px 40px}
+      .hdr-top{flex-direction:column}.hdr-period{text-align:left}
+      .monthly-tbl th,.monthly-tbl td{padding:10px 12px;font-size:13px}
+      .tbl-foot{flex-direction:column;align-items:flex-start}
+      .ai-hdr{flex-direction:column;align-items:flex-start}
+      .ai-btn{width:100%;justify-content:center}
     }
-    .card-num {
-      display: inline-block;
-      font-size: 0.7rem;
-      font-weight: 700;
-      background: var(--navy);
-      color: #fff;
-      padding: 2px 7px;
-      border-radius: 10px;
-      margin-bottom: 5px;
-    }
-    .card-location {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: var(--navy);
-    }
-    .card-date {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .card-body { padding: 12px 16px 14px; }
-    .card-field { margin-bottom: 8px; }
-    .card-field:last-child { margin-bottom: 0; }
-    .field-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      margin-bottom: 2px;
-    }
-    .field-value { font-size: 0.88rem; line-height: 1.5; }
-
-    .casualties.red    { color: var(--red);    font-weight: 600; }
-    .casualties.orange { color: var(--orange); font-weight: 600; }
-    .casualties.blue   { color: var(--blue);   font-weight: 600; }
-
-    .ref-link {
-      color: var(--blue);
-      text-decoration: none;
-      font-size: 0.82rem;
-      word-break: break-all;
-    }
-    .ref-link:hover { text-decoration: underline; }
-
-    /* ── AI Summary ── */
-    .ai-section { margin-bottom: 28px; }
-    .ai-btn {
-      background: var(--navy);
-      color: #fff;
-      border: none;
-      padding: 11px 28px;
-      border-radius: 6px;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: background 0.15s;
-    }
-    .ai-btn:hover { background: var(--navy-light); }
-    .ai-btn:disabled { opacity: 0.65; cursor: not-allowed; }
-    .ai-btn svg { width: 18px; height: 18px; }
-
-    .spinner {
-      width: 20px; height: 20px;
-      border: 3px solid rgba(255,255,255,0.35);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .ai-result {
-      margin-top: 16px;
-      background: #f0f4ff;
-      border-left: 4px solid var(--navy);
-      border-radius: 0 6px 6px 0;
-      padding: 16px 18px;
-      font-size: 0.92rem;
-      line-height: 1.75;
-      white-space: pre-wrap;
-      display: none;
-    }
-    .ai-error {
-      margin-top: 16px;
-      background: var(--red-light);
-      border-left: 4px solid var(--red);
-      border-radius: 0 6px 6px 0;
-      padding: 14px 18px;
-      font-size: 0.9rem;
-      color: var(--red);
-      display: none;
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 640px) {
-      .header h1 { font-size: 1.2rem; }
-      .stat-value { font-size: 1.5rem; }
-      .stat-item { padding: 10px 12px; }
-      .cards-grid { grid-template-columns: 1fr; }
-      #map { height: 300px; }
+    @media(max-width:420px){
+      .stat-bar{grid-template-columns:1fr}
+      .stat-item+.stat-item{border-left:none;border-top:1px solid rgba(255,255,255,.08)}
     }
   </style>
 </head>
 <body>
+<noscript><p style="font-family:sans-serif;text-align:center;padding:40px;color:#DC2626;">กรุณาเปิดใช้งาน JavaScript เพื่อดูรายงาน</p></noscript>
 
-<!-- ── HEADER ── -->
-<header class="header">
-  <div class="header-inner">
-    <h1>รายงานอุบัติเหตุอุตสาหกรรมโลก</h1>
-    <p class="header-subtitle" id="subtitle">กำลังโหลด...</p>
+<header class="hdr">
+  <div class="hdr-top">
+    <div class="hdr-brand">
+      <div class="hdr-ico">🏭</div>
+      <div>
+        <div class="hdr-title">รายงานอุบัติเหตุอุตสาหกรรมโลก</div>
+        <div class="hdr-sub">Global Major Industrial Accident Report · ปี 2569 (2026)</div>
+      </div>
+    </div>
+    <div class="hdr-period">
+      <div class="period-lbl">เดือนปัจจุบัน</div>
+      <div class="period-val" id="period-val">—</div>
+    </div>
   </div>
-  <div class="header-inner">
-    <div class="stat-bar">
-      <div class="stat-item blue">
-        <div class="stat-value" id="stat-total">—</div>
-        <div class="stat-label">เหตุการณ์ทั้งหมด</div>
-      </div>
-      <div class="stat-item red">
-        <div class="stat-value" id="stat-fatalities">—</div>
-        <div class="stat-label">ผู้เสียชีวิต (ราย)</div>
-      </div>
-      <div class="stat-item orange">
-        <div class="stat-value" id="stat-injuries">—</div>
-        <div class="stat-label">ผู้บาดเจ็บ (ราย)</div>
-      </div>
+  <div class="stat-bar">
+    <div class="stat-item">
+      <div class="stat-lbl">จำนวนเหตุการณ์เดือนนี้</div>
+      <div class="stat-val" id="s-cases">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-lbl">ผู้เสียชีวิต (ราย)</div>
+      <div class="stat-val red" id="s-fatal">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-lbl">ผู้บาดเจ็บ (ราย)</div>
+      <div class="stat-val ora" id="s-injury">—</div>
     </div>
   </div>
 </header>
 
-<div class="container">
+<main class="main">
 
-  <!-- ── MAP ── -->
-  <section>
-    <h2 class="section-title">แผนที่เหตุการณ์</h2>
-    <div class="card-wrap" style="padding-bottom: 16px;">
-      <div id="map"></div>
+  <section class="sec">
+    <div class="sec-title">แผนที่เหตุการณ์ทั่วโลก</div>
+    <div class="map-wrap">
+      <div id="world-map"></div>
       <div class="map-legend">
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#c0392b;"></div>
-          <span>มีผู้เสียชีวิต</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#e67e22;"></div>
-          <span>มีผู้บาดเจ็บเท่านั้น</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#2980b9;"></div>
-          <span>ไม่มีผู้ได้รับบาดเจ็บ</span>
+        <div class="leg-title">ระดับความรุนแรง</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#DC2626"></div>มีผู้เสียชีวิต</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#EA580C"></div>มีผู้บาดเจ็บ</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#2563EB"></div>ไม่มีผู้บาดเจ็บ</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-title">สรุปรายเดือน ปี 2569 (มกราคม – ธันวาคม)</div>
+    <div class="tbl-card">
+      <table class="monthly-tbl">
+        <thead>
+          <tr>
+            <th>เดือน</th><th>จำนวนเหตุการณ์</th><th>ผู้เสียชีวิต (ราย)</th><th>ผู้บาดเจ็บ (ราย)</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+      <div class="tbl-foot">
+        <div class="tbl-foot-label" id="tbl-foot-label">รวมทั้งปี</div>
+        <div class="totals">
+          <div class="total-item"><div class="total-v" id="foot-cases">—</div><div class="total-l">เหตุการณ์</div></div>
+          <div class="total-item"><div class="total-v red" id="foot-fatal">—</div><div class="total-l">เสียชีวิต</div></div>
+          <div class="total-item"><div class="total-v ora" id="foot-injury">—</div><div class="total-l">บาดเจ็บ</div></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── MONTHLY TABLE ── -->
-  <section>
-    <h2 class="section-title">สรุปรายเดือน</h2>
-    <div class="card-wrap">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>เดือน</th>
-              <th>จำนวนเหตุการณ์</th>
-              <th>ผู้เสียชีวิต</th>
-              <th>ผู้บาดเจ็บ</th>
-            </tr>
-          </thead>
-          <tbody id="monthly-table-body"></tbody>
-        </table>
-      </div>
-    </div>
+  <section class="sec">
+    <div class="sec-title">รายละเอียดเหตุการณ์ทั้งหมด (เรียงจากล่าสุด)</div>
+    <div class="cards-grid" id="cards-grid"></div>
   </section>
 
-  <!-- ── ACCIDENT CARDS ── -->
-  <section>
-    <h2 class="section-title">รายละเอียดเหตุการณ์</h2>
-    <div class="cards-grid" id="cards-container"></div>
-  </section>
-
-  <!-- ── AI SUMMARY ── -->
-  <section class="ai-section">
-    <h2 class="section-title">สรุปโดย AI</h2>
-    <div class="card-wrap">
-      <button class="ai-btn" id="ai-btn" onclick="requestAISummary()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-          <path d="M12 8v4l3 3"/>
-        </svg>
-        สรุปโดย AI
-      </button>
-      <div class="ai-result" id="ai-result"></div>
-      <div class="ai-error"  id="ai-error"></div>
-    </div>
-  </section>
-
-</div>
-
-<noscript><p style="font-family:sans-serif;text-align:center;padding:40px;">กรุณาเปิดใช้งาน JavaScript เพื่อดูรายงาน</p></noscript>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const THAI_MONTHS = [
-  'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'
-];
-
-function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function parseLocalDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function thaiDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return `${d} ${THAI_MONTHS[m - 1]} ${y + 543}`;
-}
-
-function severityClass(acc) {
-  if (acc.fatalities > 0) return 'red';
-  if (acc.injuries   > 0) return 'orange';
-  return 'blue';
-}
-
-function markerColor(acc) {
-  if (acc.fatalities > 0) return '#c0392b';
-  if (acc.injuries   > 0) return '#e67e22';
-  return '#2980b9';
-}
-
-function casualtyText(acc) {
-  if (acc.fatalities === 0 && acc.injuries === 0) {
-    return 'ไม่มีผู้ได้รับบาดเจ็บหรือเสียชีวิต';
-  }
-  const parts = [];
-  if (acc.fatalities > 0) parts.push(`ผู้เสียชีวิต ${acc.fatalities} ราย`);
-  if (acc.injuries   > 0) parts.push(`ผู้ได้รับบาดเจ็บ ${acc.injuries} ราย`);
-  return parts.join(' และ');
-}
-
-let allAccidents = [];
-let currentMonthAccidents = [];
-
-async function init() {
-  const res  = await fetch('/data/accidents.json');
-  allAccidents = await res.json();
-
-  const now  = new Date();
-  const curM = now.getMonth();
-  const curY = now.getFullYear();
-
-  currentMonthAccidents = allAccidents.filter(a => {
-    const d = parseLocalDate(a.date);
-    return d.getMonth() === curM && d.getFullYear() === curY;
-  });
-
-  updateHeader(curM, curY);
-  initMap();
-  renderMonthlyTable(curM, curY);
-  renderCards();
-}
-
-function updateHeader(curM, curY) {
-  document.getElementById('subtitle').textContent =
-    `${THAI_MONTHS[curM]} ${curY + 543}`;
-
-  const totalF = currentMonthAccidents.reduce((s, a) => s + a.fatalities, 0);
-  const totalI = currentMonthAccidents.reduce((s, a) => s + a.injuries,   0);
-
-  document.getElementById('stat-total').textContent      = currentMonthAccidents.length;
-  document.getElementById('stat-fatalities').textContent = totalF;
-  document.getElementById('stat-injuries').textContent   = totalI;
-}
-
-function initMap() {
-  const map = L.map('map').setView([20, 15], 2);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 18
-  }).addTo(map);
-
-  allAccidents.forEach(acc => {
-    const color = markerColor(acc);
-    const marker = L.circleMarker([acc.lat, acc.lng], {
-      radius: 10,
-      fillColor: color,
-      color: '#fff',
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.85
-    }).addTo(map);
-
-    marker.bindPopup(`
-      <div style="font-family:'Sarabun',sans-serif;min-width:220px;font-size:13px;">
-        <div style="font-weight:700;margin-bottom:4px;">เหตุการณ์ที่ ${esc(acc.id)}</div>
-        <div><b>วันที่:</b> ${esc(thaiDate(acc.date))}</div>
-        <div><b>สถานที่:</b> ${esc(acc.location)}</div>
-        <div style="margin-top:4px;"><b>ผลกระทบ:</b> ${esc(casualtyText(acc))}</div>
-      </div>
-    `);
-  });
-}
-
-function renderMonthlyTable(curM, curY) {
-  const monthlyMap = {};
-  allAccidents.forEach(a => {
-    const d = new Date(a.date);
-    const d = parseLocalDate(a.date);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (!monthlyMap[key]) monthlyMap[key] = { count: 0, fatalities: 0, injuries: 0 };
-    monthlyMap[key].count++;
-    monthlyMap[key].fatalities += a.fatalities;
-    monthlyMap[key].injuries   += a.injuries;
-  });
-
-  const tbody = document.getElementById('monthly-table-body');
-  tbody.innerHTML = '';
-
-  for (let m = 0; m < 12; m++) {
-    const key  = `${curY}-${m}`;
-    const data = monthlyMap[key] || null;
-    const tr   = document.createElement('tr');
-    if (m === curM) tr.classList.add('current-month');
-
-    const cell = (n) => n === 0
-      ? `<td class="zero">${n}</td>`
-      : `<td>${n}</td>`;
-
-    tr.innerHTML = `
-      <td>${THAI_MONTHS[m]}</td>
-      ${data ? cell(data.count) : '<td class="zero">—</td>'}
-      ${data ? cell(data.fatalities) : '<td class="zero">—</td>'}
-      ${data ? cell(data.injuries)   : '<td class="zero">—</td>'}
-    `;
-    tbody.appendChild(tr);
-  }
-}
-
-function renderCards() {
-  const sorted = [...allAccidents].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const container = document.getElementById('cards-container');
-  container.innerHTML = '';
-
-  sorted.forEach(acc => {
-    const sev = severityClass(acc);
-    const div = document.createElement('div');
-    div.className = `accident-card ${sev}`;
-    div.innerHTML = `
-      <div class="card-header">
-        <span class="card-num">เหตุการณ์ที่ ${esc(acc.id)}</span>
-        <div class="card-location">${esc(acc.location)}</div>
-        <div class="card-date">วันที่ ${esc(thaiDate(acc.date))}</div>
-      </div>
-      <div class="card-body">
-        <div class="card-field">
-          <div class="field-label">เหตุการณ์</div>
-          <div class="field-value">${esc(acc.event)}</div>
-        </div>
-        <div class="card-field">
-          <div class="field-label">ผลกระทบ</div>
-          <div class="field-value casualties ${sev}">${esc(casualtyText(acc))}</div>
-        </div>
-        <div class="card-field">
-          <div class="field-label">อ้างอิง</div>
-          <div class="field-value">
-            <a class="ref-link" href="${esc(acc.reference)}" target="_blank" rel="noopener noreferrer">
-              ${esc(acc.reference)}
-            </a>
+  <section class="sec">
+    <div class="ai-wrap">
+      <div class="ai-hdr">
+        <div class="ai-hdr-l">
+          <div class="ai-ico">✨</div>
+          <div>
+            <div class="ai-title">สรุปโดย AI</div>
+            <div class="ai-subtitle">วิเคราะห์แนวโน้มและความรุนแรงด้วย Gemini AI</div>
           </div>
         </div>
+        <button class="ai-btn" id="ai-btn" onclick="generateSummary()">
+          <span>✨</span> สรุปโดย AI
+        </button>
       </div>
-    `;
-    container.appendChild(div);
+      <div class="ai-body">
+        <div class="ai-placeholder" id="ai-ph">
+          <div class="ai-ph-ico">🤖</div>
+          <div class="ai-ph-txt">กดปุ่ม "สรุปโดย AI" เพื่อรับการวิเคราะห์เหตุการณ์อุบัติเหตุอุตสาหกรรมทั้งหมด<br>ในรูปแบบรายงานภาษาไทยระดับผู้บริหาร</div>
+        </div>
+        <div id="ai-out" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const TH_MONTHS=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function parseLocalDate(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function thaiDate(s){const d=parseLocalDate(s);return `${d.getDate()} ${TH_MONTHS[d.getMonth()]} ${d.getFullYear()+543}`;}
+function sevClass(f,i){return f>0?'red':i>0?'ora':'blu';}
+function sevLabel(f,i){return f>0?`เสียชีวิต ${f} ราย`:i>0?`บาดเจ็บ ${i} ราย`:'ไม่มีผู้บาดเจ็บ';}
+function impactText(f,i){
+  if(f>0&&i>0)return `ผู้เสียชีวิต ${f} ราย และผู้ได้รับบาดเจ็บ ${i} ราย`;
+  if(f>0)return `ผู้เสียชีวิต ${f} ราย`;
+  if(i>0)return `ผู้ได้รับบาดเจ็บ ${i} ราย`;
+  return 'ไม่มีผู้ได้รับบาดเจ็บหรือเสียชีวิต';
+}
+function markerColor(f,i){return f>0?'#DC2626':i>0?'#EA580C':'#2563EB';}
+function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch(e){return url.slice(0,40)+'…';}}
+
+let ALL=[],CUR_M=[];
+
+async function init(){
+  const res=await fetch('/data/accidents.json');
+  if(!res.ok)throw new Error(`HTTP ${res.status}`);
+  ALL=await res.json();
+  const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
+  CUR_M=ALL.filter(a=>{const d=parseLocalDate(a.date);return d.getMonth()===cm&&d.getFullYear()===cy;});
+  renderHeader(cm,cy);
+  renderTable(cm,cy);
+  renderCards();
+  renderMap();
+}
+
+function renderHeader(cm,cy){
+  document.getElementById('period-val').textContent=`${TH_MONTHS[cm]} ${cy+543}`;
+  document.getElementById('s-cases').textContent=CUR_M.length;
+  document.getElementById('s-fatal').textContent=CUR_M.reduce((s,a)=>s+a.fatalities,0);
+  document.getElementById('s-injury').textContent=CUR_M.reduce((s,a)=>s+a.injuries,0);
+}
+
+function renderTable(cm,cy){
+  const map={};
+  ALL.forEach(a=>{const d=parseLocalDate(a.date),k=d.getMonth();if(!map[k])map[k]={cases:0,fatal:0,injury:0};map[k].cases++;map[k].fatal+=a.fatalities;map[k].injury+=a.injuries;});
+  const tb=document.getElementById('tbl-body');tb.innerHTML='';
+  TH_MONTHS.forEach((name,m)=>{
+    const isCur=m===cm,isEmpty=!map[m]&&m>cm;
+    const tr=document.createElement('tr');
+    if(isCur)tr.className='cur';else if(isEmpty)tr.className='empty';
+    const d=map[m]||{cases:0,fatal:0,injury:0};
+    tr.innerHTML=isEmpty
+      ?`<td>${esc(name)}</td><td style="color:var(--textm)">—</td><td style="color:var(--textm)">—</td><td style="color:var(--textm)">—</td>`
+      :`<td>${esc(name)}${isCur?'<span class="cur-badge">เดือนนี้</span>':''}</td><td>${d.cases}</td><td>${d.fatal}</td><td>${d.injury}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('foot-cases').textContent=ALL.length;
+  document.getElementById('foot-fatal').textContent=ALL.reduce((s,a)=>s+a.fatalities,0);
+  document.getElementById('foot-injury').textContent=ALL.reduce((s,a)=>s+a.injuries,0);
+  document.getElementById('tbl-foot-label').textContent=`รวมทั้งปี ${cy+543} (ข้อมูลที่มี)`;
+}
+
+function renderCards(){
+  const sorted=[...ALL].sort((a,b)=>parseLocalDate(b.date)-parseLocalDate(a.date));
+  const grid=document.getElementById('cards-grid');grid.innerHTML='';
+  sorted.forEach(a=>{
+    const sc=sevClass(a.fatalities,a.injuries),el=document.createElement('div');
+    el.className=`acc-card ${sc}`;
+    el.innerHTML=`
+      <div class="stripe"></div>
+      <div class="card-in">
+        <div class="card-head">
+          <div class="card-head-l">
+            <div class="card-num">${esc(a.id)}</div>
+            <div style="min-width:0">
+              <div class="card-loc" title="${esc(a.location)}">${esc(a.location)}</div>
+              <div class="card-date">${esc(thaiDate(a.date))}</div>
+            </div>
+          </div>
+          <div class="sev-badge">${esc(sevLabel(a.fatalities,a.injuries))}</div>
+        </div>
+        <div class="card-div"></div>
+        <div class="field"><div class="field-lbl">เหตุการณ์</div><div class="field-txt">${esc(a.event)}</div></div>
+        <div class="field"><div class="field-lbl">ผลกระทบ</div><div class="field-impact">${esc(impactText(a.fatalities,a.injuries))}</div></div>
+        <div class="field"><div class="field-lbl">อ้างอิง</div>
+          <a href="${esc(a.reference)}" target="_blank" rel="noopener noreferrer" class="field-link">↗ ${esc(hostOf(a.reference))}</a>
+        </div>
+      </div>`;
+    grid.appendChild(el);
   });
 }
 
-async function requestAISummary() {
-  const btn    = document.getElementById('ai-btn');
-  const result = document.getElementById('ai-result');
-  const errEl  = document.getElementById('ai-error');
+function renderMap(){
+  const map=L.map('world-map',{center:[28,18],zoom:2,minZoom:1,maxZoom:12});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19
+  }).addTo(map);
+  ALL.forEach(a=>{
+    const col=markerColor(a.fatalities,a.injuries);
+    const r=Math.min(8+a.fatalities*2+a.injuries*0.05,24);
+    const fTag=a.fatalities>0?`<span class="ptag red">เสียชีวิต ${a.fatalities} ราย</span>`:'';
+    const iTag=a.injuries>0?`<span class="ptag ora">บาดเจ็บ ${a.injuries} ราย</span>`:'';
+    const nTag=a.fatalities===0&&a.injuries===0?'<span class="ptag blu">ไม่มีผู้บาดเจ็บ</span>':'';
+    L.circleMarker([a.lat,a.lng],{radius:r,fillColor:col,color:'#fff',weight:2.5,fillOpacity:.88})
+      .bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:200px">
+        <div class="popup-num">เหตุการณ์ที่ ${esc(String(a.id))}</div>
+        <div class="popup-loc">${esc(a.location)}</div>
+        <div class="popup-date">${esc(thaiDate(a.date))}</div>
+        <div class="popup-tags">${fTag}${iTag}${nTag}</div>
+      </div>`,{maxWidth:280}).addTo(map);
+  });
+}
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spinner"></div> กำลังประมวลผล...';
-  result.style.display = 'none';
-  errEl.style.display  = 'none';
-
-  const now  = new Date();
-  const curM = now.getMonth();
-  const curY = now.getFullYear();
-
-  try {
-    const res = await fetch('/api/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accidents: currentMonthAccidents,
-        month: THAI_MONTHS[curM],
-        year: curY + 543
-      })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || data.error) {
-      throw new Error(data.error || 'เกิดข้อผิดพลาด');
-    }
-
-    result.textContent   = data.summary;
-    result.style.display = 'block';
-  } catch (err) {
-    errEl.textContent   = `เกิดข้อผิดพลาด: ${err.message}`;
-    errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-        <path d="M12 8v4l3 3"/>
-      </svg>
-      สรุปโดย AI`;
+async function generateSummary(){
+  const btn=document.getElementById('ai-btn'),ph=document.getElementById('ai-ph'),out=document.getElementById('ai-out');
+  btn.disabled=true;btn.innerHTML='<span>⏳</span> กำลังประมวลผล...';
+  ph.style.display='none';out.style.display='block';
+  out.innerHTML='<div class="ai-loading"><div class="spinner"></div>กำลังวิเคราะห์ข้อมูล โปรดรอสักครู่…</div>';
+  const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
+  try{
+    const res=await fetch('/api/summarize',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({accidents:ALL,month:TH_MONTHS[cm],year:cy+543})});
+    const data=await res.json();
+    if(!res.ok||data.error)throw new Error(data.error||`HTTP ${res.status}`);
+    const paras=data.summary.split(/\n+/).filter(p=>p.trim());
+    out.innerHTML=`<div class="ai-result">${paras.map(p=>`<p>${esc(p)}</p>`).join('')}</div>`;
+  }catch(err){
+    out.innerHTML=`<div class="ai-error">⚠ เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
+  }finally{
+    btn.disabled=false;btn.innerHTML='<span>✨</span> สรุปโดย AI อีกครั้ง';
   }
 }
 
-init().catch(err => {
-  document.getElementById('subtitle').textContent = 'เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณารีเฟรชหน้าเว็บ';
-  console.error('Init error:', err);
+init().catch(err=>{
+  document.getElementById('period-val').textContent='โหลดข้อมูลไม่สำเร็จ';
+  ['s-cases','s-fatal','s-injury'].forEach(id=>document.getElementById(id).textContent='—');
+  document.querySelector('.main').innerHTML=`<div class="load-error">⚠ เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณารีเฟรชหน้าเว็บ<br><small>${esc(err.message)}</small></div>`;
+  console.error('Init error:',err);
 });
 </script>
 </body>
