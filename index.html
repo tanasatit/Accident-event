@@ -340,8 +340,9 @@ function renderTable(cm,cy){
 }
 
 function renderChart(){
+  const cy=new Date().getFullYear();
   const map={};
-  ALL.forEach(a=>{
+  ALL.filter(a=>parseLocalDate(a.date).getFullYear()===cy).forEach(a=>{
     const d=parseLocalDate(a.date),k=d.getMonth();
     if(!map[k])map[k]={cases:0,fatal:0,injury:0};
     map[k].cases++;map[k].fatal+=a.fatalities;map[k].injury+=a.injuries;
