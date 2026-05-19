@@ -5,7 +5,9 @@
   2. ไปที่ vercel.com → "Add New Project" → Import จาก GitHub
   3. Project Settings → Environment Variables → เพิ่ม:
      - GEMINI_API_KEY  (รับได้ที่ aistudio.google.com)
-     - ALLOWED_ORIGIN  (URL Vercel ของคุณ เช่น https://yourproject.vercel.app)
+     - GITHUB_TOKEN   (GitHub PAT with repo scope)
+     - GITHUB_REPO    (เช่น tanasatit/Accident-event)
+     - CRON_SECRET    (สร้างด้วย openssl rand -hex 32)
   4. กด Deploy — เว็บไซต์จะพร้อมใช้งานทันที
   สำหรับทดสอบในเครื่อง: cp .env.sample .env  แล้วรัน  vercel dev
 -->
@@ -60,8 +62,9 @@
     /* MAIN */
     .main{max-width:1280px;margin:0 auto;padding:32px 24px 56px}
     .sec{margin-bottom:40px}
-    .sec-title{font-family:var(--font-d);font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .sec-title{font-family:var(--font-d);font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
     .sec-title::before{content:'';width:4px;height:20px;background:var(--navy);border-radius:2px;flex-shrink:0}
+    .sec-title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px}
 
     /* MAP */
     .map-wrap{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm);position:relative}
@@ -100,6 +103,17 @@
     .total-v.red{color:var(--red)}.total-v.ora{color:var(--ora)}
     .total-l{font-size:11px;color:var(--text2)}
 
+    /* CHART */
+    .chart-wrap{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);padding:24px;box-shadow:var(--sh-sm)}
+    #monthly-chart{max-height:340px}
+
+    /* WEEK NAV */
+    .week-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .week-nav-btn{display:inline-flex;align-items:center;gap:5px;background:var(--surface);color:var(--navy);border:1.5px solid var(--outline);padding:6px 14px;border-radius:var(--r-pill);font-family:var(--font-th);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+    .week-nav-btn:hover:not(:disabled){background:var(--sv);border-color:var(--navy)}
+    .week-nav-btn:disabled{color:var(--textm);border-color:var(--outline);cursor:not-allowed}
+    .week-label{font-family:var(--font-d);font-size:13px;font-weight:700;color:var(--navy);padding:6px 14px;background:var(--sv);border:1.5px solid var(--outline);border-radius:var(--r-pill);white-space:nowrap}
+
     /* CARDS */
     .cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
     .acc-card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm);transition:box-shadow .2s,transform .18s;position:relative}
@@ -126,25 +140,19 @@
     .field-link{font-size:12.5px;color:var(--navy);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;transition:color .15s;word-break:break-all}
     .field-link:hover{color:var(--blu);text-decoration:underline}
 
-    /* AI SECTION */
-    .ai-wrap{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm)}
-    .ai-hdr{background:linear-gradient(140deg,#0f1c36,#1a2744 60%,#1e3a6e);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-    .ai-hdr-l{display:flex;align-items:center;gap:12px}
-    .ai-ico{width:40px;height:40px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:20px}
-    .ai-title{font-family:var(--font-d);font-size:16px;font-weight:800;color:#fff}
-    .ai-subtitle{font-size:12px;color:rgba(255,255,255,.55);margin-top:2px}
-    .ai-btn{display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--navy);border:none;padding:10px 22px;border-radius:var(--r-pill);font-family:var(--font-th);font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;white-space:nowrap}
-    .ai-btn:hover:not(:disabled){opacity:.92;transform:translateY(-1px)}.ai-btn:active:not(:disabled){transform:scale(.98)}.ai-btn:disabled{opacity:.55;cursor:not-allowed}
-    .ai-body{padding:24px}
-    .ai-placeholder{text-align:center;padding:36px 20px;color:var(--text2)}
-    .ai-ph-ico{font-size:38px;margin-bottom:12px}
-    .ai-ph-txt{font-size:14px}
-    .ai-loading{display:flex;align-items:center;justify-content:center;gap:12px;padding:36px;color:var(--text2);font-size:14px}
-    .spinner{width:22px;height:22px;border:2.5px solid var(--outline);border-top-color:var(--navy);border-radius:50%;animation:spin .75s linear infinite;flex-shrink:0}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .ai-result{font-size:15px;line-height:1.85;color:var(--text1)}
-    .ai-result p{margin-bottom:14px}.ai-result p:last-child{margin-bottom:0}
-    .ai-error{background:var(--red-bg);border:1px solid var(--red-bd);border-radius:var(--r-md);padding:14px 16px;color:var(--red);font-size:14px}
+    /* EMPTY STATE */
+    .week-empty{text-align:center;padding:56px 20px;color:var(--text2);background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-xl)}
+    .week-empty-ico{font-size:38px;margin-bottom:12px}
+    .week-empty-txt{font-size:14px}
+
+    /* PAGINATION */
+    .pagination{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:20px}
+    .pg-btn{display:inline-flex;align-items:center;background:var(--surface);color:var(--navy);border:1.5px solid var(--outline);padding:7px 18px;border-radius:var(--r-pill);font-family:var(--font-th);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+    .pg-btn:hover:not(:disabled){background:var(--sv);border-color:var(--navy)}
+    .pg-btn:disabled{color:var(--textm);border-color:var(--outline);cursor:not-allowed}
+    .pg-info{font-family:var(--font-d);font-size:13px;font-weight:700;color:var(--text2);padding:7px 14px;background:var(--sv);border:1.5px solid var(--outline);border-radius:var(--r-pill)}
+
+    /* ERROR */
     .load-error{text-align:center;padding:60px 20px;color:var(--red);font-size:15px}
 
     /* RESPONSIVE */
@@ -154,8 +162,7 @@
       .hdr-top{flex-direction:column}.hdr-period{text-align:left}
       .monthly-tbl th,.monthly-tbl td{padding:10px 12px;font-size:13px}
       .tbl-foot{flex-direction:column;align-items:flex-start}
-      .ai-hdr{flex-direction:column;align-items:flex-start}
-      .ai-btn{width:100%;justify-content:center}
+      .sec-title-row{flex-direction:column;align-items:flex-start}
     }
     @media(max-width:420px){
       .stat-bar{grid-template-columns:1fr}
@@ -199,7 +206,7 @@
 <main class="main">
 
   <section class="sec">
-    <div class="sec-title">แผนที่เหตุการณ์ทั่วโลก</div>
+    <div class="sec-title" style="margin-bottom:14px">แผนที่เหตุการณ์ทั่วโลก</div>
     <div class="map-wrap">
       <div id="world-map"></div>
       <div class="map-legend">
@@ -212,7 +219,7 @@
   </section>
 
   <section class="sec">
-    <div class="sec-title">สรุปรายเดือน ปี 2569 (มกราคม – ธันวาคม)</div>
+    <div class="sec-title" style="margin-bottom:14px">สรุปรายเดือน ปี 2569 (มกราคม – ธันวาคม)</div>
     <div class="tbl-card">
       <table class="monthly-tbl">
         <thead>
@@ -234,39 +241,32 @@
   </section>
 
   <section class="sec">
-    <div class="sec-title">รายละเอียดเหตุการณ์ทั้งหมด (เรียงจากล่าสุด)</div>
-    <div class="cards-grid" id="cards-grid"></div>
+    <div class="sec-title" style="margin-bottom:14px">กราฟสถิติรายเดือน</div>
+    <div class="chart-wrap">
+      <canvas id="monthly-chart"></canvas>
+    </div>
   </section>
 
   <section class="sec">
-    <div class="ai-wrap">
-      <div class="ai-hdr">
-        <div class="ai-hdr-l">
-          <div class="ai-ico">✨</div>
-          <div>
-            <div class="ai-title">สรุปโดย AI</div>
-            <div class="ai-subtitle">วิเคราะห์แนวโน้มและความรุนแรงด้วย Gemini AI</div>
-          </div>
-        </div>
-        <button class="ai-btn" id="ai-btn" onclick="generateSummary()">
-          <span>✨</span> สรุปโดย AI
-        </button>
-      </div>
-      <div class="ai-body">
-        <div class="ai-placeholder" id="ai-ph">
-          <div class="ai-ph-ico">🤖</div>
-          <div class="ai-ph-txt">กดปุ่ม "สรุปโดย AI" เพื่อรับการวิเคราะห์เหตุการณ์อุบัติเหตุอุตสาหกรรมทั้งหมด<br>ในรูปแบบรายงานภาษาไทยระดับผู้บริหาร</div>
-        </div>
-        <div id="ai-out" style="display:none"></div>
+    <div class="sec-title-row">
+      <div class="sec-title">รายละเอียดเหตุการณ์</div>
+      <div class="week-nav">
+        <button class="week-nav-btn" id="prev-week-btn" onclick="shiftWeek(-1)">← สัปดาห์ก่อน</button>
+        <span class="week-label" id="week-label">—</span>
+        <button class="week-nav-btn" id="next-week-btn" onclick="shiftWeek(1)" disabled>สัปดาห์ถัดไป →</button>
       </div>
     </div>
+    <div id="cards-area"></div>
   </section>
 
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 const TH_MONTHS=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+const TH_MONTHS_SHORT=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+const CARDS_PER_PAGE=6;
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function parseLocalDate(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
@@ -282,25 +282,50 @@ function impactText(f,i){
 function markerColor(f,i){return f>0?'#DC2626':i>0?'#EA580C':'#2563EB';}
 function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch(e){return url.slice(0,40)+'…';}}
 
-let ALL=[],CUR_M=[];
+/* ── ISO Week helpers (week starts Monday) ── */
+function getISOMonday(d){
+  const c=new Date(d);
+  const day=c.getDay();
+  c.setDate(c.getDate()+(day===0?-6:1-day));
+  c.setHours(0,0,0,0);
+  return c;
+}
+function getWeekRange(offset){
+  const mon=getISOMonday(new Date());
+  mon.setDate(mon.getDate()+offset*7);
+  const sun=new Date(mon);
+  sun.setDate(sun.getDate()+6);
+  sun.setHours(23,59,59,999);
+  return {start:mon,end:sun};
+}
+function formatWeekLabel(start,end){
+  const sM=TH_MONTHS_SHORT[start.getMonth()],eM=TH_MONTHS_SHORT[end.getMonth()];
+  const sY=start.getFullYear()+543,eY=end.getFullYear()+543;
+  if(sM===eM&&sY===eY)return `${start.getDate()}–${end.getDate()} ${sM} ${sY}`;
+  if(sY===eY)return `${start.getDate()} ${sM} – ${end.getDate()} ${eM} ${sY}`;
+  return `${start.getDate()} ${sM} ${sY} – ${end.getDate()} ${eM} ${eY}`;
+}
+
+let ALL=[],weekOffset=0,cardPage=1;
 
 async function init(){
   const res=await fetch('/data/accidents.json');
   if(!res.ok)throw new Error(`HTTP ${res.status}`);
   ALL=await res.json();
   const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
-  CUR_M=ALL.filter(a=>{const d=parseLocalDate(a.date);return d.getMonth()===cm&&d.getFullYear()===cy;});
-  renderHeader(cm,cy);
+  const CUR_M=ALL.filter(a=>{const d=parseLocalDate(a.date);return d.getMonth()===cm&&d.getFullYear()===cy;});
+  renderHeader(cm,cy,CUR_M);
   renderTable(cm,cy);
+  renderChart();
   renderCards();
   renderMap();
 }
 
-function renderHeader(cm,cy){
+function renderHeader(cm,cy,curM){
   document.getElementById('period-val').textContent=`${TH_MONTHS[cm]} ${cy+543}`;
-  document.getElementById('s-cases').textContent=CUR_M.length;
-  document.getElementById('s-fatal').textContent=CUR_M.reduce((s,a)=>s+a.fatalities,0);
-  document.getElementById('s-injury').textContent=CUR_M.reduce((s,a)=>s+a.injuries,0);
+  document.getElementById('s-cases').textContent=curM.length;
+  document.getElementById('s-fatal').textContent=curM.reduce((s,a)=>s+a.fatalities,0);
+  document.getElementById('s-injury').textContent=curM.reduce((s,a)=>s+a.injuries,0);
 }
 
 function renderTable(cm,cy){
@@ -323,18 +348,69 @@ function renderTable(cm,cy){
   document.getElementById('tbl-foot-label').textContent=`รวมทั้งปี ${cy+543} (ข้อมูลที่มี)`;
 }
 
+function renderChart(){
+  const map={};
+  ALL.forEach(a=>{
+    const d=parseLocalDate(a.date),k=d.getMonth();
+    if(!map[k])map[k]={cases:0,fatal:0,injury:0};
+    map[k].cases++;map[k].fatal+=a.fatalities;map[k].injury+=a.injuries;
+  });
+  const months=Object.keys(map).sort((a,b)=>+a-+b);
+  if(!months.length)return;
+  const ctx=document.getElementById('monthly-chart').getContext('2d');
+  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:months.map(m=>TH_MONTHS_SHORT[+m]),
+      datasets:[
+        {label:'เหตุการณ์',data:months.map(m=>map[m].cases),backgroundColor:'rgba(37,99,235,0.8)',borderColor:'#2563EB',borderWidth:1,borderRadius:4},
+        {label:'ผู้เสียชีวิต',data:months.map(m=>map[m].fatal),backgroundColor:'rgba(220,38,38,0.8)',borderColor:'#DC2626',borderWidth:1,borderRadius:4},
+        {label:'ผู้บาดเจ็บ',data:months.map(m=>map[m].injury),backgroundColor:'rgba(234,88,12,0.8)',borderColor:'#EA580C',borderWidth:1,borderRadius:4}
+      ]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{font:{family:"'Sarabun',sans-serif",size:13},padding:16}},
+        tooltip:{callbacks:{title:ctx=>[TH_MONTHS[months[ctx[0].dataIndex]]]}}
+      },
+      scales:{
+        x:{beginAtZero:true,ticks:{precision:0,font:{family:"'Sarabun',sans-serif"}},grid:{color:'rgba(0,0,0,.05)'}},
+        y:{ticks:{font:{family:"'Sarabun',sans-serif",size:13}},grid:{display:false}}
+      }
+    }
+  });
+}
+
 function renderCards(){
-  const sorted=[...ALL].sort((a,b)=>parseLocalDate(b.date)-parseLocalDate(a.date));
-  const grid=document.getElementById('cards-grid');grid.innerHTML='';
-  sorted.forEach(a=>{
-    const sc=sevClass(a.fatalities,a.injuries),el=document.createElement('div');
-    el.className=`acc-card ${sc}`;
-    el.innerHTML=`
+  const {start,end}=getWeekRange(weekOffset);
+  document.getElementById('week-label').textContent=formatWeekLabel(start,end);
+  document.getElementById('next-week-btn').disabled=(weekOffset>=0);
+
+  const inWeek=ALL
+    .filter(a=>{const d=parseLocalDate(a.date);return d>=start&&d<=end;})
+    .sort((a,b)=>parseLocalDate(b.date)-parseLocalDate(a.date));
+
+  const area=document.getElementById('cards-area');
+  if(inWeek.length===0){
+    area.innerHTML=`<div class="week-empty"><div class="week-empty-ico">📭</div><div class="week-empty-txt">ไม่มีเหตุการณ์ที่บันทึกไว้ในสัปดาห์นี้</div></div>`;
+    return;
+  }
+
+  const totalPages=Math.ceil(inWeek.length/CARDS_PER_PAGE);
+  if(cardPage>totalPages)cardPage=totalPages;
+  const slice=inWeek.slice((cardPage-1)*CARDS_PER_PAGE,cardPage*CARDS_PER_PAGE);
+
+  let html='<div class="cards-grid">';
+  slice.forEach(a=>{
+    const sc=sevClass(a.fatalities,a.injuries);
+    html+=`<div class="acc-card ${sc}">
       <div class="stripe"></div>
       <div class="card-in">
         <div class="card-head">
           <div class="card-head-l">
-            <div class="card-num">${esc(a.id)}</div>
+            <div class="card-num">${esc(String(a.id))}</div>
             <div style="min-width:0">
               <div class="card-loc" title="${esc(a.location)}">${esc(a.location)}</div>
               <div class="card-date">${esc(thaiDate(a.date))}</div>
@@ -348,9 +424,31 @@ function renderCards(){
         <div class="field"><div class="field-lbl">อ้างอิง</div>
           <a href="${esc(a.reference)}" target="_blank" rel="noopener noreferrer" class="field-link">↗ ${esc(hostOf(a.reference))}</a>
         </div>
-      </div>`;
-    grid.appendChild(el);
+      </div></div>`;
   });
+  html+='</div>';
+
+  if(totalPages>1){
+    html+=`<div class="pagination">
+      <button class="pg-btn" onclick="setCardPage(${cardPage-1})" ${cardPage<=1?'disabled':''}>‹ ก่อนหน้า</button>
+      <span class="pg-info">หน้า ${cardPage} / ${totalPages}</span>
+      <button class="pg-btn" onclick="setCardPage(${cardPage+1})" ${cardPage>=totalPages?'disabled':''}>ถัดไป ›</button>
+    </div>`;
+  }
+
+  area.innerHTML=html;
+}
+
+function shiftWeek(delta){
+  weekOffset+=delta;
+  cardPage=1;
+  renderCards();
+}
+
+function setCardPage(p){
+  cardPage=p;
+  renderCards();
+  document.querySelector('.sec-title-row').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 function renderMap(){
@@ -372,26 +470,6 @@ function renderMap(){
         <div class="popup-tags">${fTag}${iTag}${nTag}</div>
       </div>`,{maxWidth:280}).addTo(map);
   });
-}
-
-async function generateSummary(){
-  const btn=document.getElementById('ai-btn'),ph=document.getElementById('ai-ph'),out=document.getElementById('ai-out');
-  btn.disabled=true;btn.innerHTML='<span>⏳</span> กำลังประมวลผล...';
-  ph.style.display='none';out.style.display='block';
-  out.innerHTML='<div class="ai-loading"><div class="spinner"></div>กำลังวิเคราะห์ข้อมูล โปรดรอสักครู่…</div>';
-  const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
-  try{
-    const res=await fetch('/api/summarize',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({accidents:ALL,month:TH_MONTHS[cm],year:cy+543})});
-    const data=await res.json();
-    if(!res.ok||data.error)throw new Error(data.error||`HTTP ${res.status}`);
-    const paras=data.summary.split(/\n+/).filter(p=>p.trim());
-    out.innerHTML=`<div class="ai-result">${paras.map(p=>`<p>${esc(p)}</p>`).join('')}</div>`;
-  }catch(err){
-    out.innerHTML=`<div class="ai-error">⚠ เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
-  }finally{
-    btn.disabled=false;btn.innerHTML='<span>✨</span> สรุปโดย AI อีกครั้ง';
-  }
 }
 
 init().catch(err=>{

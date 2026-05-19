@@ -9,7 +9,7 @@ A production-ready single-page dashboard for tracking major global industrial ac
 - **Interactive world map** (Leaflet.js + OpenStreetMap) with color-coded markers by severity
 - **Monthly summary table** (Jan–Dec) with the current month highlighted
 - **Accident event cards** sorted newest-first, color-coded by fatalities/injuries
-- **AI summary** powered by Gemini 2.0 Flash — generates a Thai-language professional safety report on demand
+- **AI summary** powered by Gemini 2.5 Flash — generates a Thai-language professional safety report on demand
 - **Buddhist era (พ.ศ.)** dates throughout
 - Fully responsive — desktop and mobile
 
@@ -28,7 +28,7 @@ A production-ready single-page dashboard for tracking major global industrial ac
 ```
 ├── index.html          # Single-page frontend (map, table, cards, AI summary)
 ├── api/
-│   └── summarize.js    # Vercel serverless function — Gemini 2.0 Flash proxy
+│   └── summarize.js    # Vercel serverless function — Gemini 2.5 Flash proxy
 ├── data/
 │   └── accidents.json  # Accident data store (add new events here)
 └── vercel.json         # Vercel routing config
@@ -118,7 +118,7 @@ Pre-loaded with 12 real industrial accident events from January–May 2026:
 | Frontend | Vanilla HTML/CSS/JavaScript |
 | Map | [Leaflet.js](https://leafletjs.com) 1.9.4 + OpenStreetMap |
 | Font | [Sarabun](https://fonts.google.com/specimen/Sarabun) (Google Fonts) |
-| AI | Gemini 2.0 Flash (Google AI Studio) |
+| AI | Gemini 2.5 Flash (Google AI Studio) |
 | Hosting | Vercel (serverless functions + static) |
 
 No npm install, no build step, no framework dependencies.
