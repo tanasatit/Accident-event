@@ -219,7 +219,7 @@
   </section>
 
   <section class="sec">
-    <div class="sec-title" style="margin-bottom:14px">สรุปรายเดือน ปี 2569 (มกราคม – ธันวาคม)</div>
+    <div class="sec-title" style="margin-bottom:14px" id="monthly-table-title">สรุปรายเดือน</div>
     <div class="tbl-card">
       <table class="monthly-tbl">
         <thead>
@@ -251,9 +251,9 @@
     <div class="sec-title-row">
       <div class="sec-title">รายละเอียดเหตุการณ์</div>
       <div class="week-nav">
-        <button class="week-nav-btn" id="prev-week-btn" onclick="shiftWeek(-1)">← สัปดาห์ก่อน</button>
-        <span class="week-label" id="week-label">—</span>
-        <button class="week-nav-btn" id="next-week-btn" onclick="shiftWeek(1)" disabled>สัปดาห์ถัดไป →</button>
+        <button class="week-nav-btn" id="prev-month-btn" onclick="shiftMonth(-1)">← เดือนก่อน</button>
+        <span class="week-label" id="month-label">—</span>
+        <button class="week-nav-btn" id="next-month-btn" onclick="shiftMonth(1)" disabled>เดือนถัดไป →</button>
       </div>
     </div>
     <div id="cards-area"></div>
@@ -282,31 +282,19 @@ function impactText(f,i){
 function markerColor(f,i){return f>0?'#DC2626':i>0?'#EA580C':'#2563EB';}
 function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch(e){return url.slice(0,40)+'…';}}
 
-/* ── ISO Week helpers (week starts Monday) ── */
-function getISOMonday(d){
-  const c=new Date(d);
-  const day=c.getDay();
-  c.setDate(c.getDate()+(day===0?-6:1-day));
-  c.setHours(0,0,0,0);
-  return c;
-}
-function getWeekRange(offset){
-  const mon=getISOMonday(new Date());
-  mon.setDate(mon.getDate()+offset*7);
-  const sun=new Date(mon);
-  sun.setDate(sun.getDate()+6);
-  sun.setHours(23,59,59,999);
-  return {start:mon,end:sun};
-}
-function formatWeekLabel(start,end){
-  const sM=TH_MONTHS_SHORT[start.getMonth()],eM=TH_MONTHS_SHORT[end.getMonth()];
-  const sY=start.getFullYear()+543,eY=end.getFullYear()+543;
-  if(sM===eM&&sY===eY)return `${start.getDate()}–${end.getDate()} ${sM} ${sY}`;
-  if(sY===eY)return `${start.getDate()} ${sM} – ${end.getDate()} ${eM} ${sY}`;
-  return `${start.getDate()} ${sM} ${sY} – ${end.getDate()} ${eM} ${eY}`;
-}
 
-let ALL=[],weekOffset=0,cardPage=1;
+let ALL=[],monthOffset=0,cardPage=1;
+
+function getMonthRange(offset){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth()+offset;
+  const start=new Date(y,m,1,0,0,0,0);
+  const end=new Date(y,m+1,0,23,59,59,999);
+  return {start,end,month:start.getMonth(),year:start.getFullYear()};
+}
+function formatMonthLabel(month,year){
+  return `${TH_MONTHS[month]} ${year+543}`;
+}
 
 async function init(){
   const res=await fetch('/data/accidents.json');
@@ -329,8 +317,10 @@ function renderHeader(cm,cy,curM){
 }
 
 function renderTable(cm,cy){
+  document.getElementById('monthly-table-title').textContent=`สรุปรายเดือน ปี ${cy+543} (มกราคม – ธันวาคม)`;
   const map={};
-  ALL.forEach(a=>{const d=parseLocalDate(a.date),k=d.getMonth();if(!map[k])map[k]={cases:0,fatal:0,injury:0};map[k].cases++;map[k].fatal+=a.fatalities;map[k].injury+=a.injuries;});
+  ALL.filter(a=>parseLocalDate(a.date).getFullYear()===cy)
+     .forEach(a=>{const d=parseLocalDate(a.date),k=d.getMonth();if(!map[k])map[k]={cases:0,fatal:0,injury:0};map[k].cases++;map[k].fatal+=a.fatalities;map[k].injury+=a.injuries;});
   const tb=document.getElementById('tbl-body');tb.innerHTML='';
   TH_MONTHS.forEach((name,m)=>{
     const isCur=m===cm,isEmpty=!map[m]&&m>cm;
@@ -342,9 +332,10 @@ function renderTable(cm,cy){
       :`<td>${esc(name)}${isCur?'<span class="cur-badge">เดือนนี้</span>':''}</td><td>${d.cases}</td><td>${d.fatal}</td><td>${d.injury}</td>`;
     tb.appendChild(tr);
   });
-  document.getElementById('foot-cases').textContent=ALL.length;
-  document.getElementById('foot-fatal').textContent=ALL.reduce((s,a)=>s+a.fatalities,0);
-  document.getElementById('foot-injury').textContent=ALL.reduce((s,a)=>s+a.injuries,0);
+  const thisYear=ALL.filter(a=>parseLocalDate(a.date).getFullYear()===cy);
+  document.getElementById('foot-cases').textContent=thisYear.length;
+  document.getElementById('foot-fatal').textContent=thisYear.reduce((s,a)=>s+a.fatalities,0);
+  document.getElementById('foot-injury').textContent=thisYear.reduce((s,a)=>s+a.injuries,0);
   document.getElementById('tbl-foot-label').textContent=`รวมทั้งปี ${cy+543} (ข้อมูลที่มี)`;
 }
 
@@ -384,23 +375,23 @@ function renderChart(){
 }
 
 function renderCards(){
-  const {start,end}=getWeekRange(weekOffset);
-  document.getElementById('week-label').textContent=formatWeekLabel(start,end);
-  document.getElementById('next-week-btn').disabled=(weekOffset>=0);
+  const {start,end,month,year}=getMonthRange(monthOffset);
+  document.getElementById('month-label').textContent=formatMonthLabel(month,year);
+  document.getElementById('next-month-btn').disabled=(monthOffset>=0);
 
-  const inWeek=ALL
+  const inMonth=ALL
     .filter(a=>{const d=parseLocalDate(a.date);return d>=start&&d<=end;})
     .sort((a,b)=>parseLocalDate(b.date)-parseLocalDate(a.date));
 
   const area=document.getElementById('cards-area');
-  if(inWeek.length===0){
-    area.innerHTML=`<div class="week-empty"><div class="week-empty-ico">📭</div><div class="week-empty-txt">ไม่มีเหตุการณ์ที่บันทึกไว้ในสัปดาห์นี้</div></div>`;
+  if(inMonth.length===0){
+    area.innerHTML=`<div class="week-empty"><div class="week-empty-ico">📭</div><div class="week-empty-txt">ไม่มีเหตุการณ์ที่บันทึกไว้ในเดือนนี้</div></div>`;
     return;
   }
 
-  const totalPages=Math.ceil(inWeek.length/CARDS_PER_PAGE);
+  const totalPages=Math.ceil(inMonth.length/CARDS_PER_PAGE);
   if(cardPage>totalPages)cardPage=totalPages;
-  const slice=inWeek.slice((cardPage-1)*CARDS_PER_PAGE,cardPage*CARDS_PER_PAGE);
+  const slice=inMonth.slice((cardPage-1)*CARDS_PER_PAGE,cardPage*CARDS_PER_PAGE);
 
   let html='<div class="cards-grid">';
   slice.forEach(a=>{
@@ -439,8 +430,8 @@ function renderCards(){
   area.innerHTML=html;
 }
 
-function shiftWeek(delta){
-  weekOffset+=delta;
+function shiftMonth(delta){
+  monthOffset+=delta;
   cardPage=1;
   renderCards();
 }
