@@ -21,17 +21,23 @@ export default async function handler(req, res) {
   }
 
   // 1. Ask Gemini (with Google Search grounding) for last week's industrial accidents
+  // Allow ?from=YYYY-MM-DD&to=YYYY-MM-DD for manual testing of specific date ranges
   const today = new Date();
   const weekAgo = new Date(today);
   weekAgo.setDate(today.getDate() - 7);
-  const fromDate = weekAgo.toISOString().slice(0, 10);
-  const toDate   = today.toISOString().slice(0, 10);
+  const fromDate = (req.query?.from) || weekAgo.toISOString().slice(0, 10);
+  const toDate   = (req.query?.to)   || today.toISOString().slice(0, 10);
 
   const prompt = `You are a data extraction assistant. Search the web for major industrial accidents \
 (explosions, fires, chemical leaks, structural collapses at factories, plants, refineries, mines, or warehouses) \
 that occurred worldwide between ${fromDate} and ${toDate}.
 
-Return ONLY a valid JSON array with no markdown fences. Each element must have exactly these fields:
+CRITICAL RULES:
+- Return ONLY a raw JSON array. No markdown, no code fences, no explanation text.
+- Do NOT include any citation markers, [cite:], [1], footnotes, or reference annotations anywhere inside the JSON.
+- All string values must be plain text with no special markers.
+
+Each element must have exactly these fields:
 {
   "date": "YYYY-MM-DD",
   "location": "Site/City, Country",
@@ -56,7 +62,7 @@ Include only confirmed events with a verifiable news source URL. Return [] if no
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ googleSearch: {} }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+          generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
         })
       }
     );
@@ -65,13 +71,53 @@ Include only confirmed events with a verifiable news source URL. Return [] if no
       return res.status(502).json({ error: `Gemini error ${geminiRes.status}`, detail: txt });
     }
     const geminiData = await geminiRes.json();
-    // Collect all text parts (gemini-2.5-flash may split thinking + answer)
+    // gemini-2.5-flash outputs thinking parts (thought:true) before the actual answer — skip them
+    // Also deduplicate identical parts (grounding sometimes returns the same chunk twice)
     const parts = geminiData?.candidates?.[0]?.content?.parts || [];
-    const raw = parts.map(p => p.text || '').join('');
-    // Extract the first [...] JSON array found anywhere in the response
-    const match = raw.match(/\[[\s\S]*\]/);
-    newRecords = match ? JSON.parse(match[0]) : [];
-    if (!Array.isArray(newRecords)) newRecords = [];
+    const seen = new Set();
+    const uniqueParts = parts.filter(p => {
+      if (p.thought) return false;
+      const key = p.text || '';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const raw = uniqueParts.map(p => p.text || '').join('');
+
+    // Strip markdown fences and Gemini grounding citation markers ([cite: "..."], [1], etc.)
+    const stripped = raw
+      .replace(/```(?:json)?/gi, '').replace(/```/g, '')
+      .replace(/\[cite:[^\]]*\]/g, '')
+      .replace(/\[cite_start\]|\[cite_end\]/g, '');
+
+    // Extract JSON array — handle truncated responses by falling back to last complete object
+    const arrayStart = stripped.indexOf('[');
+    let parsed = null;
+    if (arrayStart !== -1) {
+      const chunk = stripped.slice(arrayStart);
+      // Try full parse first
+      const fullEnd = chunk.lastIndexOf(']');
+      if (fullEnd !== -1) {
+        try { parsed = JSON.parse(chunk.slice(0, fullEnd + 1)); } catch (_) {}
+      }
+      // If truncated (no closing ']'), close the array after the last complete object
+      if (!parsed) {
+        const lastObj = chunk.lastIndexOf('},');
+        if (lastObj !== -1) {
+          try { parsed = JSON.parse(chunk.slice(0, lastObj + 1) + ']'); } catch (_) {}
+        }
+      }
+    }
+
+    // Debug mode: return full raw response to inspect what Gemini actually sent
+    if (req.query?.debug === '1') {
+      return res.status(200).json({ debug: true, parts: parts.map(p => ({ thought: p.thought, textLength: p.text?.length, text: p.text })) });
+    }
+
+    if (!parsed) {
+      return res.status(500).json({ error: 'Gemini returned no valid JSON array', raw: stripped.slice(0, 500) });
+    }
+    newRecords = parsed;
   } catch (err) {
     return res.status(500).json({ error: 'Failed to get/parse Gemini response', detail: err.message });
   }
